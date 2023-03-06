@@ -7,6 +7,17 @@ const hostTarget = 'patrick-ring-motive.github.io';
 http.createServer(onRequest).listen(3000);
 
 async function onRequest(req, res) {
+  let path = req.url.replaceAll('*', '');
+  let pat = path.split('?')[0];
+
+
+
+  /*respond to ping from uptime robot*/
+  if (path == '/ping') {
+    res.statusCode = 200;
+    return res.end();
+  }
+
   req.headers.host = hostTarget;
   req.headers.referer = hostTarget;
 
