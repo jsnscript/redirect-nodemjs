@@ -61,7 +61,18 @@ async function onRequest(req, res) {
     let ct = response.headers.get('content-type');
 
     if ((ct) && (ct.indexOf('image') == -1) && (ct.indexOf('video') == -1) && (ct.indexOf('audio') == -1)) {
-
+      if(pat.endsWith('.js')){
+        res.removeHeader('content-type');
+         res.setHeader('content-type','text/javascript');
+      }
+      if(pat.endsWith('.css')){
+        res.removeHeader('content-type');
+         res.setHeader('content-type','text/css');
+      }
+      if(pat.endsWith('.html')){
+        res.removeHeader('content-type');
+         res.setHeader('content-type','text/html');
+      }
       /* Copy over target response and return */
       let resBody = await response.text();
       res.end(resBody);
