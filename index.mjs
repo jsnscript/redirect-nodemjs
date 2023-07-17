@@ -1,26 +1,39 @@
 import fetch from 'node-fetch';
 import http from 'http';
+import fileFromRequest from './static-files.mjs';
+import addCorsHeaders from './cors-headers.mjs';
 
-
-const hostTarget = 'patrick-ring-motive.github.io';
+let hostTarget = 'replit.com';
+let hostList = [];
+hostList.push(hostTarget);
 
 http.createServer(onRequest).listen(3000);
 
 async function onRequest(req, res) {
-  let path = req.url.replaceAll('*', '');
-  let pat = path.split('?')[0].split('#')[0];
+try{
+  const hostProxy = req.headers['host'];
 
 
-
-  /*respond to ping from uptime robot*/
-  if (path == '/ping') {
+  if (req.url == '/ping') {
     res.statusCode = 200;
     return res.end();
   }
 
+  res = addCorsHeaders(res);
+
+  let path = req.url.replaceAll('*', '');
+  let pat = path.split('?')[0].split('#')[0];
+
+  if (pat == '/link-resolver.js') {
+
+    return fileFromRequest(req, res);
+
+  }
+
+
+
   req.headers.host = hostTarget;
   req.headers.referer = hostTarget;
-
 
 
   /* start reading the body of the request*/
@@ -28,7 +41,13 @@ async function onRequest(req, res) {
   req.on('readable', function() {
     bdy += req.read();
   });
-  req.on('end', async function() {
+
+req.promise = new Promise((resolve, reject) => {
+req.resolve = resolve;
+});
+
+  req.on('end', req.resolve);
+  await req.promise;
     /* finish reading the body of the request*/
 
     /* start copying over the other parts of the request */
@@ -49,70 +68,48 @@ async function onRequest(req, res) {
     /* fetch from your desired target */
     let response = await fetch('https://' + hostTarget + path, options);
 
-    /* copy over response headers 
+    /* if there is a problem try redirecting to the original */
+    if (response.status > 399) {
+      res.setHeader('location', 'https://' + hostTarget + path);
+      res.statusCode = 302;
+      return res.end();
+    }
 
-    
-    */
 
+    /* copy over response headers  */
 
-    res.headers = response.headers;
+    for (let [key, value] of response.headers.entries()) {
+      res.setHeader(key, value);
+    }
+    for (let [key, value] of response.headers.keys()) {
+      if (key.length > 1) {
+        res.removeHeader(key);
+        res.setHeader(key, value);
+      }
+    }
+
+    res.removeHeader('content-encoding');
+    res.removeHeader('content-length');
+
+    res = addCorsHeaders(res);
 
     /* check to see if the response is not a text format */
     let ct = response.headers.get('content-type');
 
-    if ((ct) && (ct.indexOf('image') == -1) && (ct.indexOf('video') == -1) && (ct.indexOf('audio') == -1)) {
 
-      const path_list = pat.split('.');
-      const path_end = path_list[path_list.length - 1];
 
-      switch (path_end) {
-        case 'js':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'text/javascript');
-          break;
-        case 'css':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'text/css');
-          break;
-        case 'html':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'text/html');
-          break;
-        case 'xhtml':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'application/xhtml+xml');
-          break;
-        case 'xml':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'application/xml');
-          break; application / json
-        case 'json':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'application/json');
-          break; application / json
-        case 'jsonp':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'application/javascript');
-          break;
-        case 'pdf':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'application/pdf');
-          break;
-        case 'mht':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'multipart/related');
-          break;
-        case 'mhtml':
-          res.removeHeader('content-type');
-          res.setHeader('content-type', 'multipart/related');
-          break;
-        default:
-          break;
-      }
+    res.setHeader('content-type', ct);
+
+    if ((ct) && (!ct.includes('image')) && (!ct.includes('video')) && (!ct.includes('audio'))) {
+
 
       /* Copy over target response and return */
       let resBody = await response.text();
-      res.end(resBody);
+
+      let resNewBody = resBody.replace('<head>',
+        `<head modified>
+                                <script src="https://`+ hostProxy + `/link-resolver.js" host-list="` + btoa(JSON.stringify(hostList)) + `"></script>`);
+      return res.end(resNewBody);
 
 
     } else {
@@ -120,10 +117,15 @@ async function onRequest(req, res) {
       /* if not a text response then redirect straight to target */
       res.setHeader('location', 'https://' + hostTarget + path);
       res.statusCode = 301;
-      res.end();
+      return res.end();
 
     }
-  });
+  
+}catch(e){
 
+res.statusCoded = 500;
+return res.end('500 '+e?.message);   
+    
+}
 
 }

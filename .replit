@@ -2,6 +2,8 @@ entrypoint = "index.mjs"
 
 hidden = [".config", "package-lock.json"]
 
+run = "./node_modules/.bin/nodemon -q -x 'clear;node' index.mjs"
+
 [interpreter]
 command = [
     "prybar-nodejs",
